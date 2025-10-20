@@ -2,13 +2,16 @@
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+packages = ["dream_evaluator"]
+
 [project]
 name = "dream_evaluator"
-version = "0.1"
+version = "0.1.1"
 description = "A concise and efficient evaluation framework"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
   {name = "MZ chen", email = "hyhpchenmengzhu@gmail.com"}
 ]

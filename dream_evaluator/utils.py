@@ -17,7 +17,8 @@ eval_modules_default_path = current_file.parent.parent / 'eval_module'
 
 
 def auto_load_eval_modules(eval_modules,eval_modules_path=eval_modules_default_path):
-
+    eval_modules_path=Path(eval_modules_path)
+    
     eval_module_type_list=['dataset','method','analyzer','summarizer']
     eval_module_cls_name_dict={
         'dataset':'Dataset',
