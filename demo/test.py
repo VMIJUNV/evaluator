@@ -25,7 +25,7 @@ if __name__ == '__main__':
         "method": {
             "cls": 'OpenAIAPI',
             'args':{
-                'api_key': 'sk-5ea41be3a31b4786a662d342651394b4',
+                'api_key': '',
                 'base_url': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
                 'model_args':{
                     'model': 'qwen-flash',
