@@ -28,7 +28,14 @@ class Evaluator:
             'resume':self.eval_config.get('resume',False),
             'max_version':self.eval_config.get('max_version',5),
             'mode':self.eval_config.get('mode','one-step'),
-            'num_threads':self.eval_config.get('num_threads',1),
+
+            'batch_size':self.eval_config.get('batch_size',1),
+            'inference_batch_size':self.eval_config.get('inference_batch_size',1),
+            'analysis_batch_size':self.eval_config.get('analysis_batch_size',1),
+            'threads':self.eval_config.get('threads',1),
+            'inference_threads':self.eval_config.get('inference_threads',1),
+            'analysis_threads':self.eval_config.get('analysis_threads',1),
+
             'save_record':self.eval_config.get('save_record',True),        
             'inference_record_key':self.eval_config.get('inference_record_key',['index','output']),
             'analysis_record_key':self.eval_config.get('analysis_record_key',['index','mark','analysis']),
@@ -133,116 +140,161 @@ class Evaluator:
             if not hasattr(self, 'analysis_records'):
                 self.analysis_records = {}
 
-    def add_inference_record(self,record):
-        record=dict((k, record[k]) for k in self.eval_config['inference_record_key'])
+    def add_inference_record(self,batch_record):
+        for record in batch_record:
+            record=dict((k, record[k]) for k in self.eval_config['inference_record_key'])
+            if self.eval_config['save_record']:
+                self.recorder.add_record(self.inference_records_path,record)
+            else:
+                self.inference_records[record['index']]=record
 
-        if self.eval_config['save_record']:
-            self.recorder.add_record(self.inference_records_path,record)
-        else:
-            self.inference_records[record['index']]=record
+    def add_analysis_record(self,batch_record):
+        for record in batch_record:
+            record=dict((k, record[k]) for k in self.eval_config['analysis_record_key'])
+            if self.eval_config['save_record']:
+                self.recorder.add_record(self.analysis_records_path,record)
+            else:
+                self.analysis_records[record['index']]=record
 
-    def add_analysis_record(self,record):
-        record=dict((k, record[k]) for k in self.eval_config['analysis_record_key'])
-
-        if self.eval_config['save_record']:
-            self.recorder.add_record(self.analysis_records_path,record)
-        else:
-            self.analysis_records[record['index']]=record
-
-    def inference_single_record(self,record):
-        input=record['input']
-        output=self.method.inference(input)
-        return output
-
-    def analysis_single_record(self,record):
-        output=record['output']
-        label=record['label']
-        analysis=self.analyzer.analyse(output,label)
-        return analysis
+    def inference_batch_record(self,batch_record):
+        batch_input=[record['input'] for record in batch_record]
+        batch_output=self.method.inference(batch_input)
+        return batch_output
+    def analysis_batch_record(self,batch_record):
+        batch_output=[record['output'] for record in batch_record]
+        batch_label=[record['label'] for record in batch_record]
+        batch_analysis=self.analyzer.analyse(batch_output,batch_label)
+        return batch_analysis
 
     def summary_records(self):
         self.summarizer = self.summarizer_cls(**self.summarizer_args)
         self.load_analysis_records()
         self.summarizer.summary(self.analysis_records,self.summary_path)
 
-    def inference_single_task(self,index):
-        if index in self.inference_records:
+    def inference_batch_task(self,index_list):
+        batch_index=[]
+        for index in index_list:
+            if index in self.inference_records:
+                continue
+            batch_index.append(index)
+        
+        if len(batch_index)==0:
             return
         
-        data = self.dataset[index]
-        record={
-            'index':index,
-            'mark':data['mark'],
-            'input':data['input'],
-            'label':data['label'],
-        }
-        record['output'] = self.inference_single_record(record)
-
-        self.add_inference_record(record)
+        batch_records=[]
+        for index in batch_index:
+            data = self.dataset[index]
+            record={
+                'index':index,
+                'mark':data['mark'],
+                'input':data['input'],
+                'label':data['label'],
+            }
+            batch_records.append(record)
         
-    def analysis_single_task(self,index):
-        if index in self.analysis_records:
+        batch_output=self.inference_batch_record(batch_records)
+        for record,output in zip(batch_records,batch_output):
+            record['output']=output
+        
+        self.add_inference_record(batch_records)
+        
+    def analysis_batch_task(self,index_list):
+        batch_index=[]
+        for index in index_list:
+            if index in self.analysis_records:
+                continue
+            if index not in self.inference_records:
+                continue
+            batch_index.append(index)
+        
+        if len(batch_index)==0:
             return
         if index not in self.inference_records:
             return
         
-        data = self.dataset[index]
-        record={
-            'index':index,
-            'mark':data['mark'],
-            'input':data['input'],
-            'label':data['label'],
-        }
-        inference_record=self.inference_records[index]
-        record.update(inference_record)
-
-        record["analysis"]=self.analysis_single_record(record)
+        batch_records=[]
+        for index in batch_index:
+            data = self.dataset[index]
+            record={
+                'index':index,
+                'mark':data['mark'],
+                'input':data['input'],
+                'label':data['label'],
+            }
+            inference_record=self.inference_records[index]
+            record.update(inference_record)
+            batch_records.append(record)
         
-        self.add_analysis_record(record)
+        batch_analysis=self.analysis_batch_record(batch_records)
+        for record,analysis in zip(batch_records,batch_analysis):
+            record["analysis"]=analysis
+        
+        self.add_analysis_record(batch_records)
 
 
-    def eval_single_task(self,index):
-        if index in self.analysis_records:
+    def eval_batch_task(self,index_list):
+        batch_index=[]
+        for index in index_list:
+            if index in self.analysis_records:
+                continue
+            batch_index.append(index)
+        
+        if len(batch_index)==0:
             return
         
-        data = self.dataset[index]
-        record={
-            'index':index,
-            'mark':data['mark'],
-            'input':data['input'],
-            'label':data['label'],
-        }
-        record['output']=self.inference_single_record(record)
-        record["analysis"]=self.analysis_single_record(record)
+        batch_records=[]
+        for index in batch_index:
+            data = self.dataset[index]
+            record={
+                'index':index,
+                'mark':data['mark'],
+                'input':data['input'],
+                'label':data['label'],
+            }
+            batch_records.append(record)
         
-        self.add_analysis_record(record)
+        batch_output=self.inference_batch_record(batch_records)
+        for record,output in zip(batch_records,batch_output):
+            record['output']=output
+        
+        batch_analysis=self.analysis_batch_record(batch_records)
+        for record,analysis in zip(batch_records,batch_analysis):
+            record["analysis"]=analysis
+        
+        self.add_analysis_record(batch_records)
 
-    def executor(self,task_func,task_list,num_threads=8):
+    def executor(self,task_func,task_list,num_threads=1,batch_size=1):
+        new_task_list = [task_list[i:i + batch_size] for i in range(0, len(task_list), batch_size)]
         if num_threads<=1:
-            for task in tqdm(task_list):
-                task_func(task)
+            for batch_task in tqdm(new_task_list):
+                task_func(batch_task)
         else:
             with ThreadPoolExecutor(max_workers=num_threads) as executor:
-                futures = [executor.submit(task_func,task) for task in task_list]
+                futures = [executor.submit(task_func,batch_task) for batch_task in new_task_list]
                 pbar = tqdm(as_completed(futures), total=len(futures))
                 for future in pbar:
                     future.result()
 
     def eval(self):
         mode=self.eval_config['mode']
-        num_threads=self.eval_config['num_threads']
+        threads=self.eval_config['threads']
+        inference_threads=self.eval_config['inference_threads']
+        analysis_threads=self.eval_config['analysis_threads']
+        batch_size=self.eval_config['batch_size']
+        inference_batch_size=self.eval_config['inference_batch_size']
+        analysis_batch_size=self.eval_config['analysis_batch_size']
 
         if mode=="one-step":
             logger.info(f"Start the evaluation.")
             self.eval_init()
-            self.executor(self.eval_single_task,self.all_tasks,num_threads=num_threads)
+            self.executor(self.eval_batch_task,self.all_tasks,num_threads=threads,batch_size=batch_size)
         elif mode=="two-step":
             logger.info("Start the inference step.")
             self.eval_inference_init()
-            self.executor(self.inference_single_task,self.all_tasks,num_threads=num_threads)
+            self.executor(self.inference_batch_task,self.all_tasks,num_threads=inference_threads,batch_size=inference_batch_size)
             logger.info("Start the analysis step.")
             self.eval_analysis_init()
-            self.executor(self.analysis_single_task,self.all_tasks,num_threads=num_threads)
+            self.executor(self.analysis_batch_task,self.all_tasks,num_threads=analysis_threads,batch_size=analysis_batch_size)
         
         logger.info("Start summarizing and analyzing the results.")
         self.summary_records()

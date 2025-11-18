@@ -9,8 +9,10 @@ if __name__ == '__main__':
         "project_name": 'test',
         "output_path": "test/output/",
 
-        "resume": False,
+        "resume": True,
         "max_version": 3,
+        "inference_batch_size": 2,
+        "analysis_batch_size": 1,
         "mode": "two-step",
         "save_record": True
     }
@@ -19,7 +21,7 @@ if __name__ == '__main__':
         "dataset": {
             "cls": "AIME25",
             "args": {
-                "data_path": f"test/AIME25_3.jsonl"
+                "data_path": f"data/AIME25_3.jsonl"
             }
         },
         "method": {
