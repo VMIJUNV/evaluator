@@ -1,0 +1,26 @@
+evaluator:
+  output_path: test/output
+  resume: true
+  max_version: 10
+  mode: two step
+
+modules:
+  dataset_cls_path: eval_module/dataset/AIME25.py
+  dataset_cls: Dataset
+  dataset_init_kwargs:
+    data_path: data/AIME25_3.jsonl
+
+  inference_cls_path: eval_module/method/OpenAIAPI.py
+  inference_cls: Method
+  inference_init_kwargs:
+    api_key: ''
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    model_args:
+      model: qwen-flash
+      max_tokens: 512
+
+  analyzer_cls_path: eval_module/analyzer/QA.py
+  analyzer_cls: Analyzer
+
+  summarizer_cls_path: eval_module/summarizer/QA.py
+  summarizer_cls: Summarizer

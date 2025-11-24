@@ -6,6 +6,8 @@ class Summarizer:
         ...
 
     def summary(self,analysis_records,save_path):
+        if len(analysis_records)==0:
+            return None
         mark=[]
         analysis=[]
         for analysis_record in analysis_records.values():
